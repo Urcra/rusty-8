@@ -8,10 +8,12 @@ use sdl2::keyboard::Keycode;
 mod cpu;
 mod gpu;
 mod apu;
+mod input;
 
 use self::cpu::CPU;
 use self::gpu::Display;
 use self::apu::Audio;
+use self::input::Keypad;
 
 const DELAYTIMER: u32 = 60;
 
@@ -64,6 +66,8 @@ impl<'a> Chip8<'a> {
                     Event::Quit {..} | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                         break 'running
                     },
+                    Event::KeyDown { keycode: Some(x), .. } => self.cpu.key_state.key_pressed(x),
+                    Event::KeyUp { keycode: Some(x), .. } => self.cpu.key_state.key_released(x),
                     _ => {}
                 }
             }
@@ -82,8 +86,8 @@ impl<'a> Chip8<'a> {
                     self.audio.stopsound();
                 }
 
-                // Decrement timers
             }
+
             if current.duration_since(last_frame) > frame_delay {
                 last_frame = Instant::now();
 
@@ -91,11 +95,14 @@ impl<'a> Chip8<'a> {
 
                 self.display.draw_screen(&self.cpu.g_mem);
             }
+
             if current.duration_since(last_cycle) > cycle_delay {
                 last_cycle = Instant::now();
 
                 self.cpu.tick();
             }
+
+            // Should probably sleep for some amount of time here?
         }
     }
 

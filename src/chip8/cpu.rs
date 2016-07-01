@@ -2,6 +2,8 @@ extern crate rand;
 
 use rand::random;
 
+use super::input::Keypad;
+
 pub struct CPU {
     pc: u16,
     i_reg: u16,
@@ -13,7 +15,9 @@ pub struct CPU {
     pub delay_timer: u8,
     pub sound_timer: u8,
 
-    pub g_mem: [[u8; 64]; 32]
+    pub g_mem: [[u8; 64]; 32],
+
+    pub key_state: Keypad,
 }
 
 impl CPU {
@@ -27,6 +31,8 @@ impl CPU {
             sound_timer: 0,
             memory: rom,
             g_mem: [[0; 64]; 32],
+
+            key_state: Keypad::new(),
         }
     }
 
