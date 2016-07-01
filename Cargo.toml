@@ -5,3 +5,4 @@ authors = ["Urcra <urcra@urcra.com>"]
 
 [dependencies]
 rand = "0.3"
+sdl2 = "0.20"

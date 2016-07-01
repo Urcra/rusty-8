@@ -2,17 +2,18 @@ extern crate rand;
 
 use rand::random;
 
-#[derive(Debug)]
 pub struct CPU {
     pc: u16,
     i_reg: u16,
     v_regs: [u8; 16],
     stack: Vec<u16>,
 
-    delay_timer: u8,
-    sound_timer: u8,
-
     memory: Vec<u8>,
+
+    pub delay_timer: u8,
+    pub sound_timer: u8,
+
+    pub g_mem: [[u8; 64]; 32]
 }
 
 impl CPU {
@@ -25,6 +26,7 @@ impl CPU {
             delay_timer: 0,
             sound_timer: 0,
             memory: rom,
+            g_mem: [[0; 64]; 32],
         }
     }
 
