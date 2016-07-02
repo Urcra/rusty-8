@@ -46,7 +46,6 @@ impl<'a> Chip8<'a> {
 
     pub fn run(&mut self) {
 
-
         let mut event_pump = self.context.event_pump().unwrap();
 
 
@@ -91,9 +90,11 @@ impl<'a> Chip8<'a> {
             if current.duration_since(last_frame) > frame_delay {
                 last_frame = Instant::now();
 
-                self.display.test();
+
+                let test_mem = [[true, true, true, true, false, false, false, false, false, false, true, true, true, true, false, false, false, false, false, false, true, true, true, true, false, false, false, false, false, false, false, false, true, true, true, true, false, false, false, false, false, false, true, true, true, true, false, false, false, false, false, false, true, true, true, true, false, false, false, false, false, false, false, false]; 32];
 
                 self.display.draw_screen(&self.cpu.g_mem);
+                //self.display.draw_screen(&test_mem);
             }
 
             if current.duration_since(last_cycle) > cycle_delay {

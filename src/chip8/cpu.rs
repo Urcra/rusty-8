@@ -15,10 +15,12 @@ pub struct CPU {
     pub delay_timer: u8,
     pub sound_timer: u8,
 
-    pub g_mem: [[u8; 64]; 32],
+    pub g_mem: [[bool; 64]; 32],
 
     pub key_state: Keypad,
 }
+
+// Remember overflowing ops for u8's
 
 impl CPU {
     pub fn new(rom: Vec<u8>) -> CPU {
@@ -30,7 +32,7 @@ impl CPU {
             delay_timer: 0,
             sound_timer: 0,
             memory: rom,
-            g_mem: [[0; 64]; 32],
+            g_mem: [[false; 64]; 32],
 
             key_state: Keypad::new(),
         }
@@ -38,10 +40,9 @@ impl CPU {
 
     pub fn tick(&mut self) {
         //fetch opcode
-        println!("PC: {:?}", self.pc);
+        //self.print_state();
         let opcode = self.get_opcode();
         self.pc += 2;
-        println!("Decoding op: {:#X}", opcode);
         //match opcode
         match opcode & 0xF000 {
             0x0000 => match opcode & 0x000F {
@@ -94,14 +95,28 @@ impl CPU {
         };
     }
 
-    fn get_opcode(&mut self) -> u16 {
+    fn get_opcode(&self) -> u16 {
         let mut opcode = self.memory[self.pc as usize] as u16;
         opcode <<= 8;
         opcode | self.memory[(self.pc as usize) + 1] as u16
     }
 
+    fn print_state(&self) {
+        println!("PC: {:?}", self.pc);
+        println!("IP: {:?}", self.i_reg);
+        let opcode = self.get_opcode();
+        println!("Decoding op: {:#X}", opcode);
+    }
+
+
+
     fn op_00e0(&mut self, opcode: u16) {
-        println!("Imagine the screen being cleared");
+
+        for y in 0..32 {
+            for x in 0..64 {
+                self.g_mem[y][x] = false;
+            }
+        }
         //panic!("UNIMPLEMENTED OPCODE: {:#X}", opcode);
     }
 
@@ -186,11 +201,23 @@ impl CPU {
     }
 
     fn op_8xy4(&mut self, opcode: u16) {
-        panic!("UNIMPLEMENTED OPCODE: {:#X}", opcode);
+        let x = ((opcode & 0x0F00) >> 8) as usize;
+        let y = ((opcode & 0x00F0) >> 4) as usize;
+
+        let (res, overflow) = self.v_regs[x].overflowing_add(self.v_regs[y]);
+
+        self.v_regs[x] = res;
+        self.v_regs[0xF] = overflow as u8;
     }
 
     fn op_8xy5(&mut self, opcode: u16) {
-        panic!("UNIMPLEMENTED OPCODE: {:#X}", opcode);
+        let x = ((opcode & 0x0F00) >> 8) as usize;
+        let y = ((opcode & 0x00F0) >> 4) as usize;
+
+        let (res, overflow) = self.v_regs[x].overflowing_sub(self.v_regs[y]);
+
+        self.v_regs[x] = res;
+        self.v_regs[0xF] = overflow as u8;
     }
 
     fn op_8xy6(&mut self, opcode: u16) {
@@ -198,7 +225,13 @@ impl CPU {
     }
 
     fn op_8xy7(&mut self, opcode: u16) {
-        panic!("UNIMPLEMENTED OPCODE: {:#X}", opcode);
+        let x = ((opcode & 0x0F00) >> 8) as usize;
+        let y = ((opcode & 0x00F0) >> 4) as usize;
+
+        let (res, overflow) = self.v_regs[y].overflowing_sub(self.v_regs[x]);
+
+        self.v_regs[x] = res;
+        self.v_regs[0xF] = overflow as u8;
     }
 
     fn op_8xye(&mut self, opcode: u16) {
@@ -206,7 +239,13 @@ impl CPU {
     }
 
     fn op_9xy0(&mut self, opcode: u16) {
-        panic!("UNIMPLEMENTED OPCODE: {:#X}", opcode);
+        let x = ((opcode & 0x0F00) >> 8) as usize;
+        let y = ((opcode & 0x00F0) >> 4) as usize;
+
+        if self.v_regs[x] != self.v_regs[y] {
+            self.pc += 2;
+        }
+
     }
 
     fn op_annn(&mut self, opcode: u16) {
@@ -227,18 +266,96 @@ impl CPU {
     }
 
     fn op_dxyn(&mut self, opcode: u16) {
-        println!("Dirty graphic stuff handle it later");
-        //panic!("UNIMPLEMENTED OPCODE: {:#X}", opcode);
+
+
+        
+        let reg_x = ((opcode & 0x0F00) >> 8) as usize;
+        let reg_y = ((opcode & 0x00F0) >> 4) as usize;
+
+        let height = (opcode & 0x000F) as usize;
+        let coordx = self.v_regs[reg_x] as usize;
+        let coordy = self.v_regs[reg_y] as usize;
+
+        
+
+        let mut flipped = false;
+
+
+        for y in 0..height {
+            let mut byte = self.memory[self.i_reg as usize + y];
+            let bits = bits_in_byte(byte);
+            for x in 0..8 {
+                //let curr_bit = (byte & 0x1) != 0;
+                let curr_bit = bits[x];
+
+
+                if x+coordx > 63 || y+coordy > 31 {
+                    println!("something went wrong");
+                    println!("x: {:?} y: {:?}", x+coordx, y+coordy);
+                    continue;
+                }
+                flipped = flipped || curr_bit ^ self.g_mem[y+coordy][x+coordx];
+                self.g_mem[y+coordy][x+coordx] ^= curr_bit;
+                
+                byte >>= 1;
+            }
+        }
+
+        self.v_regs[0xF] = flipped as u8;
+        
+
+
+        /*
+        for yline in 0..height {
+            let data = self.memory[self.i_reg as usize + yline];
+            let xpixelinv = 7;
+            for xpixel in 0..8 {
+                let mask = 1 << xpixelinv;
+
+                if (data & mask) != 0 {
+                    let x = coordx + xpixel;
+                    let y = coordy + yline;
+                    println!("x,y{:?}", (x,y));
+                    if self.g_mem[x][y] {
+                        self.v_regs[0xF] = 1;
+                    }
+                    self.g_mem[x][y] ^= true;
+                }
+            }
+        }
+        */
+
+        fn bits_in_byte(byte: u8) -> Vec<bool>{
+            let mut bits = Vec::new();
+            bits.push(((byte & 0b10000000) >> 7) != 0);
+            bits.push(((byte & 0b01000000) >> 6) != 0);
+            bits.push(((byte & 0b00100000) >> 5) != 0);
+            bits.push(((byte & 0b00010000) >> 4) != 0);
+            bits.push(((byte & 0b00001000) >> 3) != 0);
+            bits.push(((byte & 0b00000100) >> 2) != 0);
+            bits.push(((byte & 0b00000010) >> 1) != 0);
+            bits.push(((byte & 0b00000001) >> 0) != 0);
+
+            bits
+        }
     }
 
     fn op_ex9e(&mut self, opcode: u16) {
-        println!("Dirty input stuff handle it later");
-        //panic!("UNIMPLEMENTED OPCODE: {:#X}", opcode);
+        let x = ((opcode & 0x0F00) >> 8) as usize;
+        let num = self.v_regs[x] as usize;
+
+        if self.key_state.key_state[num] {
+            self.pc += 2;
+        }
     }
 
     fn op_exa1(&mut self, opcode: u16) {
-        println!("Dirty input stuff handle it later");
-        //panic!("UNIMPLEMENTED OPCODE: {:#X}", opcode);
+        let x = ((opcode & 0x0F00) >> 8) as usize;
+        let num = self.v_regs[x] as usize;
+
+        if !self.key_state.key_state[num] {
+            self.pc += 2;
+        }
     }
 
     fn op_fx07(&mut self, opcode: u16) {
@@ -247,8 +364,12 @@ impl CPU {
     }
 
     fn op_fx0a(&mut self, opcode: u16) {
-        println!("Dirty input stuff handle it later");
-        //panic!("UNIMPLEMENTED OPCODE: {:#X}", opcode);
+        let x = ((opcode & 0x0F00) >> 8) as usize;
+
+        match self.key_state.last_pressed {
+            Some(key) => self.v_regs[x] = key,
+            None      => self.pc -= 2,
+        };
     }
 
     fn op_fx15(&mut self, opcode: u16) {
@@ -257,7 +378,8 @@ impl CPU {
     }
 
     fn op_fx18(&mut self, opcode: u16) {
-        panic!("UNIMPLEMENTED OPCODE: {:#X}", opcode);
+        let x = ((opcode & 0x0F00) >> 8) as usize;
+        self.sound_timer = self.v_regs[x];
     }
 
     fn op_fx1e(&mut self, opcode: u16) {
@@ -266,7 +388,10 @@ impl CPU {
     }
 
     fn op_fx29(&mut self, opcode: u16) {
-        panic!("UNIMPLEMENTED OPCODE: {:#X}", opcode);
+        // may be wrong
+        let x = ((opcode & 0x0F00) >> 8) as usize;
+
+        self.i_reg = self.v_regs[x] as u16 * 5;
     }
 
     fn op_fx33(&mut self, opcode: u16) {
@@ -290,6 +415,8 @@ impl CPU {
         }
 
         self.i_reg = self.i_reg.wrapping_add((x + 1) as u16);
+
+
     }
 
     fn op_fx65(&mut self, opcode: u16) {

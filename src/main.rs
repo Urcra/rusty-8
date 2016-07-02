@@ -13,16 +13,45 @@ fn main() {
     let rom_name = env::args().nth(1).unwrap();
     let mut rom_fd = File::open(rom_name).unwrap();
 
+    /*
     let mut rom_buf = vec![0; 0x200];
+
     rom_fd.read_to_end(&mut rom_buf);
+    */
+
+    let rom_start = 0x200;
+    let mut memory = vec![0; 4000];
+    let mut rom_buf = Vec::new();
+    rom_fd.read_to_end(&mut rom_buf);
+
+    for i in 0..FONTSET.len() {
+        memory[i] = FONTSET[i];
+    }
+
+    for i in 0..rom_buf.len() {
+        memory[i + rom_start] = rom_buf[i];
+    }
+
 
     // Get these as input, or from ini file
     let cpu_hz = 600;
     let fps = 60;
 
-    let width = 800;
-    let height = 600;
+    let width = 1280;
+    let height = 640;
 
-    let mut chip_8 = Chip8::new(rom_buf, cpu_hz, fps, width, height);
+    //let width = 64;
+    //let height = 32;
+
+    let mut chip_8 = Chip8::new(memory, cpu_hz, fps, width, height);
     chip_8.run();
 }
+
+static FONTSET: [u8; 80] = [0xF0, 0x90, 0x90, 0x90, 0xF0, 0x20, 0x60, 0x20, 0x20, 0x70,
+                            0xF0, 0x10, 0xF0, 0x80, 0xF0, 0xF0, 0x10, 0xF0, 0x10, 0xF0,
+                            0x90, 0x90, 0xF0, 0x10, 0x10, 0xF0, 0x80, 0xF0, 0x10, 0xF0,
+                            0xF0, 0x80, 0xF0, 0x90, 0xF0, 0xF0, 0x10, 0x20, 0x40, 0x40,
+                            0xF0, 0x90, 0xF0, 0x90, 0xF0, 0xF0, 0x90, 0xF0, 0x10, 0xF0,
+                            0xF0, 0x90, 0xF0, 0x90, 0x90, 0xE0, 0x90, 0xE0, 0x90, 0xE0,
+                            0xF0, 0x80, 0x80, 0x80, 0xF0, 0xE0, 0x90, 0x90, 0x90, 0xE0,
+                            0xF0, 0x80, 0xF0, 0x80, 0xF0, 0xF0, 0x80, 0xF0, 0x80, 0x80];
