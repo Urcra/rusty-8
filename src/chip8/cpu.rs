@@ -1,3 +1,7 @@
+//Debug
+use std::io;
+use std::io::prelude::*;
+
 extern crate rand;
 
 use rand::random;
@@ -102,14 +106,17 @@ impl CPU {
     }
 
     fn print_state(&self) {
+        println!("-------------------");
         println!("PC: {:?}", self.pc);
         println!("IP: {:?}", self.i_reg);
         let opcode = self.get_opcode();
         println!("Decoding op: {:#X}", opcode);
+        println!("-------------------\n");
     }
 
 
 
+    // Clear the screen
     fn op_00e0(&mut self, opcode: u16) {
 
         for y in 0..32 {
@@ -120,19 +127,23 @@ impl CPU {
         //panic!("UNIMPLEMENTED OPCODE: {:#X}", opcode);
     }
 
+    // Return from subroutine
     fn op_00ee(&mut self, opcode: u16) {
         self.pc = self.stack.pop().unwrap();
     }
 
+    // Jump to adresss NNN
     fn op_1nnn(&mut self, opcode: u16) {
         self.pc = opcode & 0x0FFF;
     }
 
+    // Execute subroutine starting at adress NNN
     fn op_2nnn(&mut self, opcode: u16) {
         self.stack.push(self.pc);
         self.pc = opcode & 0x0FFF;
     }
 
+    // Skip the next instruction if the value of register VX equals NN
     fn op_3xnn(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
         let nn = (opcode & 0x00FF) as u8;
@@ -140,8 +151,11 @@ impl CPU {
         if self.v_regs[x] == nn {
             self.pc += 2;
         }
+
+        println!("{:?} == {:?} : {:?}",self.v_regs[x], nn, self.v_regs[x] == nn);
     }
 
+    // Skip the next instruction if the value of register VX is not equal to NN
     fn op_4xnn(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
         let nn = (opcode & 0x00FF) as u8;
@@ -151,6 +165,7 @@ impl CPU {
         }
     }
 
+    // Skip the next instruction if the value of register VX is not equal to the value of register VY
     fn op_5xy0(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
         let y = ((opcode & 0x00F0) >> 4) as usize;
@@ -160,18 +175,21 @@ impl CPU {
         }
     }
 
+    // Store NN in register VX
     fn op_6xnn(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
         let nn = (opcode & 0x00FF) as u8;
         self.v_regs[x] = nn;
     }
 
+    // Add the NN to the value in VX
     fn op_7xnn(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
         let nn = (opcode & 0x00FF) as u8;
         self.v_regs[x] = self.v_regs[x].wrapping_add(nn);
     }
 
+    // Store the value of register VY in register VX
     fn op_8xy0(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
         let y = ((opcode & 0x00F0) >> 4) as usize;
@@ -179,6 +197,7 @@ impl CPU {
         self.v_regs[x] = self.v_regs[y];
     }
 
+    // Set VX to VX OR VY
     fn op_8xy1(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
         let y = ((opcode & 0x00F0) >> 4) as usize;
@@ -186,6 +205,7 @@ impl CPU {
         self.v_regs[x] = self.v_regs[x] | self.v_regs[y];
     }
 
+    // Set VX to VX AND VY
     fn op_8xy2(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
         let y = ((opcode & 0x00F0) >> 4) as usize;
@@ -193,6 +213,7 @@ impl CPU {
         self.v_regs[x] = self.v_regs[x] & self.v_regs[y];
     }
 
+    // Set VX to VX XOR VY
     fn op_8xy3(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
         let y = ((opcode & 0x00F0) >> 4) as usize;
@@ -200,6 +221,7 @@ impl CPU {
         self.v_regs[x] = self.v_regs[x] ^ self.v_regs[y];
     }
 
+    // Add VY to VX, set VF to if a carry occured
     fn op_8xy4(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
         let y = ((opcode & 0x00F0) >> 4) as usize;
@@ -210,6 +232,9 @@ impl CPU {
         self.v_regs[0xF] = overflow as u8;
     }
 
+    // Subtract the value of register VY from register VX
+    // Set VF to 00 if a borrow occurs
+    // Set VF to 01 if a borrow does not occur
     fn op_8xy5(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
         let y = ((opcode & 0x00F0) >> 4) as usize;
@@ -217,13 +242,16 @@ impl CPU {
         let (res, overflow) = self.v_regs[x].overflowing_sub(self.v_regs[y]);
 
         self.v_regs[x] = res;
-        self.v_regs[0xF] = overflow as u8;
+        self.v_regs[0xF] = !overflow as u8;
     }
 
     fn op_8xy6(&mut self, opcode: u16) {
         panic!("UNIMPLEMENTED OPCODE: {:#X}", opcode);
     }
 
+    // Set register VX to the value of VY minus VX
+    // Set VF to 00 if a borrow occurs
+    // Set VF to 01 if a borrow does not occur
     fn op_8xy7(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
         let y = ((opcode & 0x00F0) >> 4) as usize;
@@ -231,13 +259,14 @@ impl CPU {
         let (res, overflow) = self.v_regs[y].overflowing_sub(self.v_regs[x]);
 
         self.v_regs[x] = res;
-        self.v_regs[0xF] = overflow as u8;
+        self.v_regs[0xF] = !overflow as u8;
     }
 
     fn op_8xye(&mut self, opcode: u16) {
         panic!("UNIMPLEMENTED OPCODE: {:#X}", opcode);
     }
 
+    // Skip the following instruction if the value of register VX is not equal to the value of register VY
     fn op_9xy0(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
         let y = ((opcode & 0x00F0) >> 4) as usize;
@@ -248,14 +277,17 @@ impl CPU {
 
     }
 
+    // Store the adress NNN in register i
     fn op_annn(&mut self, opcode: u16) {
         self.i_reg = opcode & 0x0FFF;
     }
 
+    // Jump to adress NNN + V0
     fn op_bnnn(&mut self, opcode: u16) {
         panic!("UNIMPLEMENTED OPCODE: {:#X}", opcode);
     }
 
+    // Set VX to a random number with a mask of NN
     fn op_cxnn(&mut self, opcode: u16) {
         let random_number = rand::random::<u8>();
 
@@ -265,10 +297,8 @@ impl CPU {
         self.v_regs[x] = random_number & nn;
     }
 
+    // Draw sprite
     fn op_dxyn(&mut self, opcode: u16) {
-
-
-        
         let reg_x = ((opcode & 0x0F00) >> 8) as usize;
         let reg_y = ((opcode & 0x00F0) >> 4) as usize;
 
@@ -280,80 +310,28 @@ impl CPU {
             panic!("");
         }
 
-        
-
+    
         let mut flipped = false;
 
 
         for y in 0..height {
             let mut byte = self.memory[self.i_reg as usize + y];
-            let bits = bits_in_byte(byte);
             for x in 0..8 {
                 let mask = 0b_1000_0000_u8 >> x; 
                 let curr_bit = byte & mask != 0;
-                //let curr_bit = (byte & 0x1) != 0;
-                //let curr_bit = bits[x];
 
                 let x_index = (x + coordx) % 64;
                 let y_index = (y + coordy) % 32;
 
-
-                if x_index > 63 || y_index > 31 {
-                    println!("something went wrong");
-                    println!("x: {:?} y: {:?}", x_index, y+coordy);
-                    panic!("");
-                }
-                flipped = flipped || curr_bit && self.g_mem[y_index][x_index];
+                flipped |= curr_bit & self.g_mem[y_index][x_index];
                 self.g_mem[y_index][x_index] ^= curr_bit;
-                
-                //byte >>= 1;
             }
         }
 
         self.v_regs[0xF] = flipped as u8;
-        if flipped {
-            self.v_regs[0xF] = 0x01;
-        } else {
-            self.v_regs[0xF] = 0x00;
-        }
-        
-
-
-        /*
-        for yline in 0..height {
-            let data = self.memory[self.i_reg as usize + yline];
-            let xpixelinv = 7;
-            for xpixel in 0..8 {
-                let mask = 1 << xpixelinv;
-
-                if (data & mask) != 0 {
-                    let x = coordx + xpixel;
-                    let y = coordy + yline;
-                    println!("x,y{:?}", (x,y));
-                    if self.g_mem[x][y] {
-                        self.v_regs[0xF] = 1;
-                    }
-                    self.g_mem[x][y] ^= true;
-                }
-            }
-        }
-        */
-
-        fn bits_in_byte(byte: u8) -> Vec<bool>{
-            let mut bits = Vec::new();
-            bits.push(((byte & 0b10000000) >> 7) != 0);
-            bits.push(((byte & 0b01000000) >> 6) != 0);
-            bits.push(((byte & 0b00100000) >> 5) != 0);
-            bits.push(((byte & 0b00010000) >> 4) != 0);
-            bits.push(((byte & 0b00001000) >> 3) != 0);
-            bits.push(((byte & 0b00000100) >> 2) != 0);
-            bits.push(((byte & 0b00000010) >> 1) != 0);
-            bits.push(((byte & 0b00000001) >> 0) != 0);
-
-            bits
-        }
     }
 
+    // Skip the following instruction if the key corresponding to the hex value in VX is pressed
     fn op_ex9e(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
         let num = self.v_regs[x] as usize;
@@ -363,6 +341,7 @@ impl CPU {
         }
     }
 
+    // Skip the following instruction if the key corresponding to the hex value in VX is not pressed
     fn op_exa1(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
         let num = self.v_regs[x] as usize;
@@ -372,11 +351,13 @@ impl CPU {
         }
     }
 
+    // Store the value of the delay timer in VX
     fn op_fx07(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
         self.v_regs[x] = self.delay_timer;
     }
 
+    // Wait for a keypress and store it in VX
     fn op_fx0a(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
 
@@ -386,28 +367,32 @@ impl CPU {
         };
     }
 
+    // Set the delay timer to the value in register VX
     fn op_fx15(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
         self.delay_timer = self.v_regs[x];
     }
 
+    // Set the sound timer to the value in register VX
     fn op_fx18(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
         self.sound_timer = self.v_regs[x];
     }
 
+    // Add the value stored in VX to register i
     fn op_fx1e(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
         self.i_reg = self.i_reg.wrapping_add(self.v_regs[x] as u16);
     }
 
+    // Set register i to the memory adress of the digit in VX
     fn op_fx29(&mut self, opcode: u16) {
-        // may be wrong
         let x = ((opcode & 0x0F00) >> 8) as usize;
 
         self.i_reg = self.v_regs[x] as u16 * 5;
     }
 
+    // Store the binary-coded decimal equivalent of the value stored in register VX at addresses I, I+1, and I+2
     fn op_fx33(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
 
@@ -420,6 +405,8 @@ impl CPU {
         self.memory[(self.i_reg as usize) + 2] = units;
     }
 
+    // Store the values of registers V0 to VX inclusive in memory starting at address I
+    // I is set to I + X + 1 after operation
     fn op_fx55(&mut self, opcode: u16) {
 
         let x = ((opcode & 0x0F00) >> 8) as usize;
@@ -433,6 +420,8 @@ impl CPU {
 
     }
 
+    // Fill registers V0 to VX inclusive with the values stored in memory starting at address I
+    // I is set to I + X + 1 after operation
     fn op_fx65(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
 
