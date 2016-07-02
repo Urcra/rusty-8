@@ -16,13 +16,15 @@ impl Audio {
         }
     }
 
-    pub fn startsound(&self) {
+    pub fn startsound(&mut self) {
         if self.beeping {return}
         println!("Now beeping");
+        self.beeping = true;
     }
 
-    pub fn stopsound(&self) {
+    pub fn stopsound(&mut self) {
         if !self.beeping {return}
         println!("No longer beeping");
+        self.beeping = false;
     }
 }

@@ -276,6 +276,10 @@ impl CPU {
         let coordx = self.v_regs[reg_x] as usize;
         let coordy = self.v_regs[reg_y] as usize;
 
+        if coordx > 0x3F || coordy > 0x1F {
+            panic!("");
+        }
+
         
 
         let mut flipped = false;
@@ -285,8 +289,10 @@ impl CPU {
             let mut byte = self.memory[self.i_reg as usize + y];
             let bits = bits_in_byte(byte);
             for x in 0..8 {
+                let mask = 0b_1000_0000_u8 >> x; 
+                let curr_bit = byte & mask != 0;
                 //let curr_bit = (byte & 0x1) != 0;
-                let curr_bit = bits[x];
+                //let curr_bit = bits[x];
 
 
                 if x+coordx > 63 || y+coordy > 31 {
@@ -297,11 +303,16 @@ impl CPU {
                 flipped = flipped || curr_bit ^ self.g_mem[y+coordy][x+coordx];
                 self.g_mem[y+coordy][x+coordx] ^= curr_bit;
                 
-                byte >>= 1;
+                //byte >>= 1;
             }
         }
 
         self.v_regs[0xF] = flipped as u8;
+        if flipped {
+            self.v_regs[0xF] = 0x01;
+        } else {
+            self.v_regs[0xF] = 0x00;
+        }
         
 
 
