@@ -40,7 +40,7 @@ impl CPU {
 
     pub fn tick(&mut self) {
         //fetch opcode
-        //self.print_state();
+        self.print_state();
         let opcode = self.get_opcode();
         self.pc += 2;
         //match opcode
@@ -294,14 +294,17 @@ impl CPU {
                 //let curr_bit = (byte & 0x1) != 0;
                 //let curr_bit = bits[x];
 
+                let x_index = (x + coordx) % 64;
+                let y_index = (y + coordy) % 32;
 
-                if x+coordx > 63 || y+coordy > 31 {
+
+                if x_index > 63 || y_index > 31 {
                     println!("something went wrong");
-                    println!("x: {:?} y: {:?}", x+coordx, y+coordy);
-                    continue;
+                    println!("x: {:?} y: {:?}", x_index, y+coordy);
+                    panic!("");
                 }
-                flipped = flipped || curr_bit ^ self.g_mem[y+coordy][x+coordx];
-                self.g_mem[y+coordy][x+coordx] ^= curr_bit;
+                flipped = flipped || curr_bit && self.g_mem[y_index][x_index];
+                self.g_mem[y_index][x_index] ^= curr_bit;
                 
                 //byte >>= 1;
             }
