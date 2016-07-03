@@ -2,10 +2,8 @@ extern crate sdl2;
 
 use sdl2::pixels::Color;
 use sdl2::rect::Point;
-use sdl2::rect::Rect;
 
 pub struct Display<'a> {
-    name: String,
     height: u32,
     width: u32,
     renderer: sdl2::render::Renderer<'a>,
@@ -20,10 +18,9 @@ impl<'a> Display<'a> {
             .build()
             .unwrap();
 
-        let mut renderer = window.renderer().build().unwrap();
+        let renderer = window.renderer().build().unwrap();
 
         let mut disp = Display {
-            name: name,
             height: height,
             width: width,
             renderer: renderer,
@@ -33,17 +30,14 @@ impl<'a> Display<'a> {
         disp
     }
 
-    pub fn test(&mut self) {
-        self.renderer.set_draw_color(Color::RGB(255, 0, 0));
-        self.renderer.clear();
-        self.renderer.present();
-    }
-
     pub fn adjust_scale(&mut self) {
         let w_scale = self.width / 64; 
         let h_scale = self.height / 32; 
 
-        self.renderer.set_scale(w_scale as f32, h_scale as f32);
+        match self.renderer.set_scale(w_scale as f32, h_scale as f32) {
+            Err(e) => println!("Error: {:?}", e),
+            _      => {},
+        };
     }
 
     pub fn draw_screen(&mut self, g_mem: &[[bool; 64]; 32]) {
@@ -54,7 +48,10 @@ impl<'a> Display<'a> {
                 } else {
                     self.renderer.set_draw_color(Color::RGB(255, 255, 255));
                 }
-                self.renderer.draw_point( Point::new(x as i32,y as i32));
+                match self.renderer.draw_point( Point::new(x as i32,y as i32)) {
+                    Err(e) => println!("Error: {:?}", e),
+                    _      => {},
+                }
             }
         }
 

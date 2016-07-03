@@ -13,9 +13,10 @@ mod input;
 use self::cpu::CPU;
 use self::gpu::Display;
 use self::apu::Audio;
-use self::input::Keypad;
 
 const DELAYTIMER: u32 = 60;
+const ROM_START: usize = 0x200;
+const RAM_SIZE: usize = 4000;
 
 pub struct Chip8<'a> {
     cpu: CPU,
@@ -29,15 +30,27 @@ pub struct Chip8<'a> {
 
 
 impl<'a> Chip8<'a> {
-    pub fn new(rom: Vec<u8>, cpu_hz: u32, fps: u32, width: u32, height: u32) -> Chip8<'a> {
+    pub fn new(rom_name: &str, rom: Vec<u8>, cpu_hz: u32, fps: u32, width: u32, height: u32) -> Chip8<'a> {
+
+        let mut memory = vec![0; RAM_SIZE];
+
+        for i in 0..FONTSET.len() {
+            memory[i] = FONTSET[i];
+        }
+
+        for i in 0..rom.len() {
+            memory[i + ROM_START] = rom[i];
+        }
+
 
         let sdl_context = sdl2::init().unwrap();
         let video_subsystem = sdl_context.video().unwrap();
+        let audio_subsystem = sdl_context.audio().unwrap();
 
         Chip8 {
-            cpu: CPU::new(rom),
-            display: Display::new(video_subsystem, "test".into(), width, height),
-            audio: Audio::new("test".into()),
+            cpu: CPU::new(memory),
+            display: Display::new(video_subsystem, format!("Rusty8 - {}", rom_name).into(), width, height),
+            audio: Audio::new(audio_subsystem),
             context: sdl_context,
             cpu_hz: cpu_hz,
             fps: fps,
@@ -89,23 +102,24 @@ impl<'a> Chip8<'a> {
 
             if current.duration_since(last_frame) > frame_delay {
                 last_frame = Instant::now();
-
-
-                let test_mem = [[true, true, true, true, false, false, false, false, false, false, true, true, true, true, false, false, false, false, false, false, true, true, true, true, false, false, false, false, false, false, false, false, true, true, true, true, false, false, false, false, false, false, true, true, true, true, false, false, false, false, false, false, true, true, true, true, false, false, false, false, false, false, false, false]; 32];
-
                 self.display.draw_screen(&self.cpu.g_mem);
-                //self.display.draw_screen(&test_mem);
             }
 
             if current.duration_since(last_cycle) > cycle_delay {
                 last_cycle = Instant::now();
-
                 self.cpu.tick();
             }
 
             // Should probably sleep for some amount of time here?
         }
     }
-
-
 }
+
+static FONTSET: [u8; 80] = [0xF0, 0x90, 0x90, 0x90, 0xF0, 0x20, 0x60, 0x20, 0x20, 0x70,
+                            0xF0, 0x10, 0xF0, 0x80, 0xF0, 0xF0, 0x10, 0xF0, 0x10, 0xF0,
+                            0x90, 0x90, 0xF0, 0x10, 0x10, 0xF0, 0x80, 0xF0, 0x10, 0xF0,
+                            0xF0, 0x80, 0xF0, 0x90, 0xF0, 0xF0, 0x10, 0x20, 0x40, 0x40,
+                            0xF0, 0x90, 0xF0, 0x90, 0xF0, 0xF0, 0x90, 0xF0, 0x10, 0xF0,
+                            0xF0, 0x90, 0xF0, 0x90, 0x90, 0xE0, 0x90, 0xE0, 0x90, 0xE0,
+                            0xF0, 0x80, 0x80, 0x80, 0xF0, 0xE0, 0x90, 0x90, 0x90, 0xE0,
+                            0xF0, 0x80, 0xF0, 0x80, 0xF0, 0xF0, 0x80, 0xF0, 0x80, 0x80];

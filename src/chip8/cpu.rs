@@ -1,7 +1,3 @@
-//Debug
-use std::io;
-use std::io::prelude::*;
-
 extern crate rand;
 
 use rand::random;
@@ -24,8 +20,6 @@ pub struct CPU {
     pub key_state: Keypad,
 }
 
-// Remember overflowing ops for u8's
-
 impl CPU {
     pub fn new(rom: Vec<u8>) -> CPU {
         CPU {
@@ -44,14 +38,14 @@ impl CPU {
 
     pub fn tick(&mut self) {
         //fetch opcode
-        self.print_state();
+        //self.print_state();
         let opcode = self.get_opcode();
         self.pc += 2;
         //match opcode
         match opcode & 0xF000 {
             0x0000 => match opcode & 0x000F {
-                        0x0000 => self.op_00e0(opcode),
-                        0x000E => self.op_00ee(opcode),
+                        0x0000 => self.op_00e0(),
+                        0x000E => self.op_00ee(),
                         _      => println!("Unkown opcode: {:#X}", opcode),
                     },
             0x1000 => self.op_1nnn(opcode),
@@ -115,20 +109,17 @@ impl CPU {
     }
 
 
-
     // Clear the screen
-    fn op_00e0(&mut self, opcode: u16) {
-
+    fn op_00e0(&mut self) {
         for y in 0..32 {
             for x in 0..64 {
                 self.g_mem[y][x] = false;
             }
         }
-        //panic!("UNIMPLEMENTED OPCODE: {:#X}", opcode);
     }
 
     // Return from subroutine
-    fn op_00ee(&mut self, opcode: u16) {
+    fn op_00ee(&mut self) {
         self.pc = self.stack.pop().unwrap();
     }
 
@@ -151,8 +142,6 @@ impl CPU {
         if self.v_regs[x] == nn {
             self.pc += 2;
         }
-
-        println!("{:?} == {:?} : {:?}",self.v_regs[x], nn, self.v_regs[x] == nn);
     }
 
     // Skip the next instruction if the value of register VX is not equal to NN
@@ -246,7 +235,14 @@ impl CPU {
     }
 
     fn op_8xy6(&mut self, opcode: u16) {
-        panic!("UNIMPLEMENTED OPCODE: {:#X}", opcode);
+        let x = ((opcode & 0x0F00) >> 8) as usize;
+        let y = ((opcode & 0x00F0) >> 4) as usize;
+
+        
+        let lsb = self.v_regs[y] & 0b_0000_0001_u8;
+
+        self.v_regs[x] = self.v_regs[y] >> 1;
+        self.v_regs[0xF] = lsb;
     }
 
     // Set register VX to the value of VY minus VX
@@ -263,7 +259,14 @@ impl CPU {
     }
 
     fn op_8xye(&mut self, opcode: u16) {
-        panic!("UNIMPLEMENTED OPCODE: {:#X}", opcode);
+        let x = ((opcode & 0x0F00) >> 8) as usize;
+        let y = ((opcode & 0x00F0) >> 4) as usize;
+
+        let msb = (self.v_regs[y] & 0b_1000_0000_u8) >> 7;
+
+
+        self.v_regs[x] = self.v_regs[y] << 1;
+        self.v_regs[0xF] = msb;
     }
 
     // Skip the following instruction if the value of register VX is not equal to the value of register VY
@@ -284,12 +287,14 @@ impl CPU {
 
     // Jump to adress NNN + V0
     fn op_bnnn(&mut self, opcode: u16) {
-        panic!("UNIMPLEMENTED OPCODE: {:#X}", opcode);
+        let nnn = opcode & 0x0FFF;
+
+        self.pc = nnn + self.v_regs[0] as u16;
     }
 
     // Set VX to a random number with a mask of NN
     fn op_cxnn(&mut self, opcode: u16) {
-        let random_number = rand::random::<u8>();
+        let random_number = random::<u8>();
 
         let x = ((opcode & 0x0F00) >> 8) as usize;
         let nn = (opcode & 0x00FF) as u8;
@@ -306,22 +311,19 @@ impl CPU {
         let coordx = self.v_regs[reg_x] as usize;
         let coordy = self.v_regs[reg_y] as usize;
 
-        if coordx > 0x3F || coordy > 0x1F {
-            panic!("");
-        }
-
     
         let mut flipped = false;
 
 
         for y in 0..height {
-            let mut byte = self.memory[self.i_reg as usize + y];
+            let byte = self.memory[self.i_reg as usize + y];
             for x in 0..8 {
                 let mask = 0b_1000_0000_u8 >> x; 
                 let curr_bit = byte & mask != 0;
 
                 let x_index = (x + coordx) % 64;
                 let y_index = (y + coordy) % 32;
+
 
                 flipped |= curr_bit & self.g_mem[y_index][x_index];
                 self.g_mem[y_index][x_index] ^= curr_bit;
@@ -408,7 +410,6 @@ impl CPU {
     // Store the values of registers V0 to VX inclusive in memory starting at address I
     // I is set to I + X + 1 after operation
     fn op_fx55(&mut self, opcode: u16) {
-
         let x = ((opcode & 0x0F00) >> 8) as usize;
 
         for i in 0..(x+1) {
